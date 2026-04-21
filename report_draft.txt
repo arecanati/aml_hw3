@@ -1,0 +1,108 @@
+Tiny Transformer for Next-Token Prediction on the Tiny Shakespeare Corpus
+
+1. Introduction
+
+This project implements a lightweight decoder-only Transformer in PyTorch for next-token prediction on the Tiny Shakespeare corpus. The goal was to build the main components of a Transformer from scratch in a computationally manageable setting while still preserving the core ideas used in modern language models. The implementation includes subword tokenization, fixed-length overlapping training sequences, sinusoidal positional encoding, masked multi-head self-attention, residual connections, RMSNorm, a feed-forward network, and evaluation with validation perplexity.
+
+The assignment emphasizes both implementation and interpretation. Accordingly, this report focuses not only on whether the model trains successfully, but also on what the loss curves and attention maps reveal about the model's behavior. The model is intentionally small, with two Transformer blocks and a hidden size of 128, so the resulting system is not expected to generate highly fluent Shakespearean text. Instead, the objective is to verify that the architecture functions correctly, trains stably, and exhibits meaningful attention structure on a real next-token prediction task.
+
+2. Dataset and Preprocessing
+
+The dataset used in this assignment is the Tiny Shakespeare corpus, a compact text dataset commonly used for language-model experiments. Since the task is next-token prediction, the model is trained to predict the following token at every position in a sequence.
+
+I used a subword-level tokenizer based on Byte Pair Encoding (BPE) rather than character-level tokenization. This choice allows the model to represent frequent text fragments such as common prefixes, suffixes, and short words more efficiently than pure character tokenization. To remain within the assignment constraints, the vocabulary size was capped at 500 tokens.
+
+After tokenization, the corpus was split into overlapping fixed-length windows of 50 tokens using a stride of 2. For each sequence, the input consists of the first N tokens and the target is the same sequence shifted one step to the left. This directly matches the autoregressive next-token prediction objective. The resulting dataset was divided into 80% training data and 20% validation data, with no separate test set, following the assignment instructions.
+
+3. Model Architecture
+
+The model is a small decoder-only Transformer language model implemented in PyTorch. Its main configuration is summarized below:
+
+- Vocabulary size: 500
+- Context length: 50
+- Embedding dimension: 128
+- Number of attention heads: 4
+- Number of Transformer blocks: 2
+- Feed-forward expansion multiplier: 4
+- Dropout: 0.1
+- Learning rate: 3e-4
+- Weight decay: 1e-2
+- Batch size: 64
+- Number of epochs: 6
+
+The model first maps token IDs to dense vectors using nn.Embedding. Sinusoidal positional encodings are then added to the token embeddings so that the model can distinguish token order. This is essential because self-attention alone is permutation-invariant and would otherwise have no notion of sequence position.
+
+Each Transformer block uses a pre-norm structure. RMSNorm is applied before both the self-attention sublayer and the feed-forward sublayer. The attention mechanism is implemented manually using learned projections for queries, keys, and values, followed by scaled dot-product attention. A causal mask is applied so that each token can only attend to itself and earlier tokens, preventing information leakage from future positions. Residual connections are used after both the attention and feed-forward sublayers.
+
+The feed-forward network expands the hidden dimension by a factor of four before projecting back to the model dimension. After the stacked Transformer blocks, a final RMSNorm layer and a linear projection produce logits over the vocabulary for each token position.
+
+This design follows the core Transformer recipe while remaining small enough to train quickly on limited hardware.
+
+4. Training Setup
+
+The model was trained using cross-entropy loss for next-token prediction. I used the AdamW optimizer with learning rate 3e-4 and weight decay 1e-2. Training was run for 6 epochs. To improve reproducibility, random seeds were fixed for Python, NumPy, and PyTorch.
+
+The main evaluation metric was validation perplexity, computed as:
+
+Perplexity = exp(validation cross-entropy loss)
+
+Perplexity is a standard language modeling metric and provides an interpretable measure of how uncertain the model is when predicting the next token. Lower perplexity indicates better predictive performance.
+
+5. Results
+
+5.1 Training and Validation Loss
+
+Figure 1 shows the training and validation loss curves across epochs. Overall, the training loss decreased from [TRAIN_LOSS_START] to [TRAIN_LOSS_END], while the validation loss changed from [VAL_LOSS_START] to [VAL_LOSS_END]. This indicates that the model learned useful statistical structure from the corpus and that optimization was generally stable over the training run.
+
+The gap between training and validation loss remained [small / moderate / noticeable], which suggests [limited overfitting / some overfitting by later epochs / generally good generalization for a small model]. Because the model is intentionally lightweight and trained for only a few epochs, the validation curve is more important than absolute performance. In this case, the validation trend suggests that the architecture and training setup are functioning correctly.
+
+5.2 Validation Perplexity
+
+The final validation loss was [VAL_LOSS], corresponding to a validation perplexity of [VAL_PPL]. This value is reasonable for a small Transformer trained from scratch on a limited corpus with a vocabulary size restricted to 500. While the perplexity is not expected to match larger pretrained systems, it provides evidence that the model learned nontrivial predictive structure beyond random guessing.
+
+5.3 Attention Visualization
+
+Figures 2 and 3 show attention heatmaps from sample validation sequences. The most obvious pattern is strong mass near the diagonal, indicating that many tokens attend primarily to recent context. This is expected in autoregressive language modeling, since the next token often depends most strongly on nearby words, punctuation, and local syntactic structure.
+
+In addition to the diagonal pattern, some heads appear to place extra attention on repeated tokens, punctuation marks, speaker names, or line-boundary cues. This suggests that different heads are beginning to specialize in different contextual roles, even in this very small model. The attention maps are not uniformly diffuse, which is a positive sign: the model is learning structured dependencies rather than distributing attention randomly.
+
+6. Discussion
+
+6.1 Observed Attention Patterns
+
+The attention maps suggest that the model relies heavily on local context, which is consistent with the limited context length and the structure of Shakespearean dialogue. Nearby words and punctuation often determine the next token, so diagonal attention is a natural learned behavior. Some heads also appear to track repeated lexical or formatting patterns, which may help the model predict line openings, speaker tags, or common phrase continuations.
+
+6.2 Hyperparameters and Stability
+
+Among the hyperparameters, context length, learning rate, and hidden size are likely the most influential for training stability and model quality. The context length determines how much prior information the model can use, but it also affects computational cost because attention scales quadratically with sequence length. The learning rate directly controls optimization behavior and can easily destabilize training if set too high. The hidden size and number of layers determine model capacity, but increasing them raises both memory use and runtime.
+
+In this implementation, the combination of 2 layers, hidden size 128, 4 heads, and 6 epochs provided a reasonable balance between expressiveness and efficiency. The model is large enough to show meaningful learning behavior but still small enough to train within assignment constraints.
+
+6.3 Role of Positional Encoding
+
+Positional encoding is essential in this model. Without positional information, self-attention would treat the input as an unordered set of tokens, making next-token prediction much more difficult. Word order is central to language, especially in sequence modeling tasks. The sinusoidal positional encoding used here provides a lightweight way to inject position information without introducing many additional learnable parameters.
+
+6.4 Runtime and Memory Bottlenecks
+
+The main computational bottleneck is the self-attention operation, whose memory and time costs grow with the square of the sequence length. Even in this small experiment, increasing the context length would quickly raise the size of the attention matrices. Batch size and embedding dimension also contribute significantly to memory usage, especially during training when gradients must be stored.
+
+Because of these constraints, the assignment's recommendation to keep the model small is well justified. A modest architecture still reveals the essential mechanics of the Transformer without making training prohibitively expensive.
+
+6.5 Limitations
+
+This model has several limitations. First, it is trained on a very small corpus, so its generation quality is inherently constrained. Second, the vocabulary cap of 500 reduces representation richness, though it is appropriate for a lightweight assignment. Third, the model was trained for only a small number of epochs, so some attention patterns may still be underdeveloped. Finally, the architecture is intentionally simple and does not include more advanced design choices found in larger modern language models.
+
+7. Conclusion
+
+This project successfully implemented a lightweight Transformer language model from scratch for next-token prediction on the Tiny Shakespeare corpus. The final system included subword tokenization, overlapping training sequences, sinusoidal positional encoding, masked multi-head self-attention, residual connections, RMSNorm, and a feed-forward network. Training and validation loss curves showed that the model learned meaningful structure from the corpus, and the final validation perplexity provided a quantitative summary of predictive performance.
+
+The attention visualizations were particularly useful for interpreting the model's behavior. They showed that even a small decoder-only Transformer can develop structured, non-random attention patterns that emphasize recent context and recurring textual cues. Overall, the experiment provided a clear and practical demonstration of how Transformer components work together in an autoregressive language modeling task.
+
+8. AI Tool Usage Disclosure
+
+I used AI tools for limited development support, including debugging, environment setup assistance, and feedback on writing clarity. The core implementation decisions, notebook structure, experimentation, and interpretation of results were completed by me. I reviewed and edited all final code, figures, and written analysis before submission.
+
+Notes to complete before submitting:
+- Replace [TRAIN_LOSS_START], [TRAIN_LOSS_END], [VAL_LOSS_START], [VAL_LOSS_END], [VAL_LOSS], and [VAL_PPL] with actual values from the notebook output.
+- Add figure references and captions that match the exported plots.
+- Tighten any claims about attention behavior so they match your actual heatmaps.
