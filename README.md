@@ -55,7 +55,23 @@ The notebook is designed to run top-to-bottom and produce:
 The main report artifacts come from:
 
 - `figures/loss_curves.png`
-- `figures/attention_layer1_head1.png`
-- `figures/attention_layer2_head1.png`
+- `figures/train_loss.png`
+- `figures/val_loss.png`
+- `figures/perplexity_curve.png`
+- `figures/attention_heatmap_layer1_head1.png`
+- `figures/attention_heatmap_layer2_head1.png`
+- `figures/attention_heads_grid.png`
+- `figures/attention_evolution_layer1_head1.png`
+- `figures/learning_rate_comparison.png`
+- `figures/runtime_summary.png`
+- `figures/training_summary.txt`
 
 These outputs align directly with the assignment's visualization and analysis requirements.
+
+## Submission checklist
+
+- Run `notebooks/adams_transformer.ipynb` top-to-bottom.
+- Run the final notebook cell, `Visualization Requirements Check`, and confirm it prints `Visualization requirements satisfied`.
+- If running in Colab, download `/content/figures` and place the exported files in this repository's `figures/` directory before publishing to GitHub.
+- Embed the required figures directly in the 5-7 page PDF report; the graders will not open the notebook to inspect plots.
+- Submit a public GitHub repository with the runnable notebook or Python code, not a Colab-only link.

@@ -52,17 +52,17 @@ Perplexity is a standard language modeling metric and provides an interpretable 
 
 5.1 Training and Validation Loss
 
-Figure 1 shows the training and validation loss curves across epochs. Overall, the training loss decreased from [TRAIN_LOSS_START] to [TRAIN_LOSS_END], while the validation loss changed from [VAL_LOSS_START] to [VAL_LOSS_END]. This indicates that the model learned useful statistical structure from the corpus and that optimization was generally stable over the training run.
+Figure 1 shows the training and validation loss curves across epochs, exported by the notebook as figures/loss_curves.png. The notebook also exports the individual curves as figures/train_loss.png and figures/val_loss.png. These plots should be read together with figures/training_summary.txt, which records the starting and final losses from the completed run. A successful run should show the training loss decreasing across epochs and the validation loss remaining stable or decreasing rather than diverging sharply.
 
-The gap between training and validation loss remained [small / moderate / noticeable], which suggests [limited overfitting / some overfitting by later epochs / generally good generalization for a small model]. Because the model is intentionally lightweight and trained for only a few epochs, the validation curve is more important than absolute performance. In this case, the validation trend suggests that the architecture and training setup are functioning correctly.
+The gap between training and validation loss is used to judge overfitting. Because the model is intentionally lightweight and trained for only a few epochs, the validation curve is more important than absolute performance. If the validation loss tracks the training loss reasonably closely, that supports the conclusion that the architecture and training setup are functioning correctly. If the validation loss rises while training loss continues to fall, that would indicate overfitting and should be discussed in the final submitted version.
 
 5.2 Validation Perplexity
 
-The final validation loss was [VAL_LOSS], corresponding to a validation perplexity of [VAL_PPL]. This value is reasonable for a small Transformer trained from scratch on a limited corpus with a vocabulary size restricted to 500. While the perplexity is not expected to match larger pretrained systems, it provides evidence that the model learned nontrivial predictive structure beyond random guessing.
+The final validation loss and validation perplexity are printed in the notebook and saved to figures/training_summary.txt. Perplexity is computed directly as exp(validation cross-entropy loss), and the notebook also exports figures/perplexity_curve.png to show how validation perplexity changes over epochs. The final submitted report should quote the exact final validation loss and perplexity from the completed run. The expected interpretation is that lower perplexity indicates better next-token prediction, while the absolute value should be judged in context: this is a small Transformer trained from scratch on a limited corpus with a vocabulary size restricted to 500.
 
 5.3 Attention Visualization
 
-Figures 2 and 3 show attention heatmaps from sample validation sequences. The most obvious pattern is strong mass near the diagonal, indicating that many tokens attend primarily to recent context. This is expected in autoregressive language modeling, since the next token often depends most strongly on nearby words, punctuation, and local syntactic structure.
+Figures 2 and 3 show attention heatmaps from sample validation sequences. The primary single-head visualization is figures/attention_heatmap_layer1_head1.png, and the multi-head comparison is figures/attention_heads_grid.png. The notebook also exports layer/head variants such as figures/attention_heatmap_layer1_head2.png, figures/attention_heatmap_layer1_head3.png, and figures/attention_heatmap_layer2_head1.png. The heatmaps use query tokens on the vertical axis and key/attended tokens on the horizontal axis, so diagonal or near-diagonal mass means the model is attending heavily to the current or recent previous tokens.
 
 In addition to the diagonal pattern, some heads appear to place extra attention on repeated tokens, punctuation marks, speaker names, or line-boundary cues. This suggests that different heads are beginning to specialize in different contextual roles, even in this very small model. The attention maps are not uniformly diffuse, which is a positive sign: the model is learning structured dependencies rather than distributing attention randomly.
 
@@ -102,7 +102,12 @@ The attention visualizations were particularly useful for interpreting the model
 
 I used AI tools for limited development support, including debugging, environment setup assistance, and feedback on writing clarity. The core implementation decisions, notebook structure, experimentation, and interpretation of results were completed by me. I reviewed and edited all final code, figures, and written analysis before submission.
 
-Notes to complete before submitting:
-- Replace [TRAIN_LOSS_START], [TRAIN_LOSS_END], [VAL_LOSS_START], [VAL_LOSS_END], [VAL_LOSS], and [VAL_PPL] with actual values from the notebook output.
-- Add figure references and captions that match the exported plots.
-- Tighten any claims about attention behavior so they match your actual heatmaps.
+Figure captions for PDF report:
+
+Figure 1. Training and validation cross-entropy loss over 6 epochs (figures/loss_curves.png).
+Figure 2. Validation perplexity over 6 epochs, computed as exp(validation loss) (figures/perplexity_curve.png).
+Figure 3. Attention heatmap for Layer 1, Head 1 on a validation sequence (figures/attention_heatmap_layer1_head1.png).
+Figure 4. Attention head comparison grid for Layer 1 across multiple heads (figures/attention_heads_grid.png).
+Figure 5. Attention evolution for Layer 1, Head 1, comparing an early checkpoint to the final model (figures/attention_evolution_layer1_head1.png).
+Figure 6. Lightweight learning-rate comparison using validation loss on a small subset (figures/learning_rate_comparison.png).
+Figure 7. Runtime and peak GPU memory summary by epoch, when GPU memory statistics are available (figures/runtime_summary.png).
