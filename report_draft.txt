@@ -8,9 +8,9 @@ The assignment emphasizes both implementation and interpretation. Accordingly, t
 
 2. Dataset and Preprocessing
 
-The dataset used in this assignment is the Tiny Shakespeare corpus, a compact text dataset commonly used for language-model experiments. Since the task is next-token prediction, the model is trained to predict the following token at every position in a sequence.
+The dataset used in this assignment is the Tiny Shakespeare corpus, a compact text dataset commonly used for language-model experiments. The raw corpus contained 1,115,394 characters. Since the task is next-token prediction, the model is trained to predict the following token at every position in a sequence.
 
-I used a subword-level tokenizer based on Byte Pair Encoding (BPE) rather than character-level tokenization. This choice allows the model to represent frequent text fragments such as common prefixes, suffixes, and short words more efficiently than pure character tokenization. To remain within the assignment constraints, the vocabulary size was capped at 500 tokens.
+I used a subword-level tokenizer based on Byte Pair Encoding (BPE) rather than character-level tokenization. This choice allows the model to represent frequent text fragments such as common prefixes, suffixes, and short words more efficiently than pure character tokenization. To remain within the assignment constraints, the vocabulary size was capped at 500 tokens. After tokenization, the corpus contained 500,959 tokens.
 
 After tokenization, the corpus was split into overlapping fixed-length windows of 50 tokens using a stride of 2. For each sequence, the input consists of the first N tokens and the target is the same sequence shifted one step to the left. This directly matches the autoregressive next-token prediction objective. The resulting dataset was divided into 80% training data and 20% validation data, with no separate test set, following the assignment instructions.
 
@@ -29,6 +29,7 @@ The model is a small decoder-only Transformer language model implemented in PyTo
 - Weight decay: 1e-2
 - Batch size: 64
 - Number of epochs: 6
+- Trainable parameters: 524,660
 
 The model first maps token IDs to dense vectors using nn.Embedding. Sinusoidal positional encodings are then added to the token embeddings so that the model can distinguish token order. This is essential because self-attention alone is permutation-invariant and would otherwise have no notion of sequence position.
 
@@ -36,7 +37,7 @@ Each Transformer block uses a pre-norm structure. RMSNorm is applied before both
 
 The feed-forward network expands the hidden dimension by a factor of four before projecting back to the model dimension. After the stacked Transformer blocks, a final RMSNorm layer and a linear projection produce logits over the vocabulary for each token position.
 
-This design follows the core Transformer recipe while remaining small enough to train quickly on limited hardware.
+This design follows the core Transformer recipe while remaining small enough to train quickly on limited hardware. The final model has 524,660 trainable parameters, so it is large enough to learn nontrivial sequence patterns but still lightweight enough for a short Colab GPU run.
 
 4. Training Setup
 
@@ -52,29 +53,35 @@ Perplexity is a standard language modeling metric and provides an interpretable 
 
 5.1 Training and Validation Loss
 
-Figure 1 shows the training and validation loss curves across epochs, exported by the notebook as figures/loss_curves.png. The notebook also exports the individual curves as figures/train_loss.png and figures/val_loss.png. These plots should be read together with figures/training_summary.txt, which records the starting and final losses from the completed run. A successful run should show the training loss decreasing across epochs and the validation loss remaining stable or decreasing rather than diverging sharply.
+Figure 1 shows the training and validation loss curves across epochs. The training loss decreased from 3.8127 after the first epoch to 2.9603 after the sixth epoch, a reduction of 0.8524. The validation loss also improved, decreasing from 3.7697 to 3.5964 over the same period. This shows that the model learned useful structure from the corpus rather than only memorizing the training batches.
 
-The gap between training and validation loss is used to judge overfitting. Because the model is intentionally lightweight and trained for only a few epochs, the validation curve is more important than absolute performance. If the validation loss tracks the training loss reasonably closely, that supports the conclusion that the architecture and training setup are functioning correctly. If the validation loss rises while training loss continues to fall, that would indicate overfitting and should be discussed in the final submitted version.
+The training loss decreased more quickly than the validation loss, so a generalization gap appeared by the end of training. However, the validation loss continued to decline slightly through epoch 6 rather than increasing, which suggests that the model was still learning useful held-out patterns and had not entered severe overfitting within this short training run. The slower validation improvement is expected for a small Transformer trained from scratch on a compact corpus.
 
 5.2 Validation Perplexity
 
-The final validation loss and validation perplexity are printed in the notebook and saved to figures/training_summary.txt. Perplexity is computed directly as exp(validation cross-entropy loss), and the notebook also exports figures/perplexity_curve.png to show how validation perplexity changes over epochs. The final submitted report should quote the exact final validation loss and perplexity from the completed run. The expected interpretation is that lower perplexity indicates better next-token prediction, while the absolute value should be judged in context: this is a small Transformer trained from scratch on a limited corpus with a vocabulary size restricted to 500.
+The final validation loss was 3.5964, corresponding to a validation perplexity of 36.4671. Perplexity improved from 43.37 after epoch 1 to 36.47 after epoch 6. This means the model became less uncertain on held-out next-token prediction as training progressed. The absolute perplexity is still high compared with large pretrained language models, but it is reasonable for a two-layer Transformer trained from scratch with a vocabulary capped at 500 tokens.
 
 5.3 Attention Visualization
 
-Figures 2 and 3 show attention heatmaps from sample validation sequences. The primary single-head visualization is figures/attention_heatmap_layer1_head1.png, and the multi-head comparison is figures/attention_heads_grid.png. The notebook also exports layer/head variants such as figures/attention_heatmap_layer1_head2.png, figures/attention_heatmap_layer1_head3.png, and figures/attention_heatmap_layer2_head1.png. The heatmaps use query tokens on the vertical axis and key/attended tokens on the horizontal axis, so diagonal or near-diagonal mass means the model is attending heavily to the current or recent previous tokens.
+Figures 3 and 4 show attention heatmaps from sample validation sequences. Figure 3 focuses on one attention head, while Figure 4 compares multiple heads from the first Transformer layer. Additional heatmaps compare different heads and layers. The heatmaps use query tokens on the vertical axis and key/attended tokens on the horizontal axis, so diagonal or near-diagonal mass means the model is attending heavily to the current or recent previous tokens.
 
-In addition to the diagonal pattern, some heads appear to place extra attention on repeated tokens, punctuation marks, speaker names, or line-boundary cues. This suggests that different heads are beginning to specialize in different contextual roles, even in this very small model. The attention maps are not uniformly diffuse, which is a positive sign: the model is learning structured dependencies rather than distributing attention randomly.
+The attention visualizations are useful because they are not uniformly diffuse: the model assigns stronger weights to particular prior positions. The clearest pattern is local or diagonal attention, which fits the next-token task because nearby words, punctuation, and line breaks often provide the strongest clues in Shakespeare-style dialogue. The multi-head grid shows that attention should be interpreted head by head rather than as a single global pattern; different heads can emphasize different previous positions.
+
+5.4 Qualitative Generation and Learning-Rate Comparison
+
+The sample generations provide a qualitative check on what the trained model learned. For the prompt "ROMEO:", the model generated text with Shakespeare-like formatting and line breaks, including phrases such as "ROMEO: traitor" and later references to "the Tower." For the prompt "JULIET:", it produced dialogue-like text with speaker transitions such as "GLOUCESTER:". The generated text is not fully coherent, but it does show that the model learned local formatting patterns, speaker-name conventions, and short phrase structure from the corpus.
+
+I also ran a lightweight learning-rate comparison on a smaller subset using 1e-4 and 3e-4. After two epochs, 1e-4 reached a validation loss of 6.2827 and validation perplexity of 535.26, while 3e-4 reached a validation loss of 6.1202 and validation perplexity of 454.98. On this small comparison, 3e-4 learned faster and achieved the better validation result, which supports using 3e-4 for the main training run.
 
 6. Discussion
 
 6.1 Observed Attention Patterns
 
-The attention maps suggest that the model relies heavily on local context, which is consistent with the limited context length and the structure of Shakespearean dialogue. Nearby words and punctuation often determine the next token, so diagonal attention is a natural learned behavior. Some heads also appear to track repeated lexical or formatting patterns, which may help the model predict line openings, speaker tags, or common phrase continuations.
+The attention maps suggest that the model relies heavily on local context, which is consistent with the limited context length and the structure of Shakespearean dialogue. Nearby words and punctuation often determine the next token, so diagonal attention is a natural learned behavior. The attention-evolution plot compares an epoch-1 checkpoint with the final model and shows how training changes the internal attention pattern over time. This comparison is important because it connects the quantitative loss reduction to a qualitative change in model behavior.
 
 6.2 Hyperparameters and Stability
 
-Among the hyperparameters, context length, learning rate, and hidden size are likely the most influential for training stability and model quality. The context length determines how much prior information the model can use, but it also affects computational cost because attention scales quadratically with sequence length. The learning rate directly controls optimization behavior and can easily destabilize training if set too high. The hidden size and number of layers determine model capacity, but increasing them raises both memory use and runtime.
+Among the hyperparameters, context length, learning rate, and hidden size are likely the most influential for training stability and model quality. The context length determines how much prior information the model can use, but it also affects computational cost because attention scales quadratically with sequence length. The learning-rate comparison showed that 3e-4 outperformed 1e-4 on the small subset after two epochs, reaching lower validation loss and lower perplexity. The hidden size and number of layers determine model capacity, but increasing them raises both memory use and runtime.
 
 In this implementation, the combination of 2 layers, hidden size 128, 4 heads, and 6 epochs provided a reasonable balance between expressiveness and efficiency. The model is large enough to show meaningful learning behavior but still small enough to train within assignment constraints.
 
@@ -84,7 +91,7 @@ Positional encoding is essential in this model. Without positional information, 
 
 6.4 Runtime and Memory Bottlenecks
 
-The main computational bottleneck is the self-attention operation, whose memory and time costs grow with the square of the sequence length. Even in this small experiment, increasing the context length would quickly raise the size of the attention matrices. Batch size and embedding dimension also contribute significantly to memory usage, especially during training when gradients must be stored.
+The main computational bottleneck is the self-attention operation, whose memory and time costs grow with the square of the sequence length. In the completed run, each epoch took about 32.70 seconds on average, and peak GPU memory was about 122.7 MB. This is manageable for the current context length of 50 and hidden size of 128, but increasing context length would quickly raise the size of the attention matrices. Batch size and embedding dimension also contribute significantly to memory usage, especially during training when gradients must be stored.
 
 Because of these constraints, the assignment's recommendation to keep the model small is well justified. A modest architecture still reveals the essential mechanics of the Transformer without making training prohibitively expensive.
 
@@ -94,9 +101,9 @@ This model has several limitations. First, it is trained on a very small corpus,
 
 7. Conclusion
 
-This project successfully implemented a lightweight Transformer language model from scratch for next-token prediction on the Tiny Shakespeare corpus. The final system included subword tokenization, overlapping training sequences, sinusoidal positional encoding, masked multi-head self-attention, residual connections, RMSNorm, and a feed-forward network. Training and validation loss curves showed that the model learned meaningful structure from the corpus, and the final validation perplexity provided a quantitative summary of predictive performance.
+This project successfully implemented a lightweight Transformer language model from scratch for next-token prediction on the Tiny Shakespeare corpus. The final system included subword tokenization, overlapping training sequences, sinusoidal positional encoding, masked multi-head self-attention, residual connections, RMSNorm, and a feed-forward network. Across six epochs, training loss decreased from 3.8127 to 2.9603, validation loss decreased from 3.7697 to 3.5964, and validation perplexity improved from 43.37 to 36.47. These results show that the model learned meaningful structure from the corpus while remaining compact at 524,660 trainable parameters.
 
-The attention visualizations were particularly useful for interpreting the model's behavior. They showed that even a small decoder-only Transformer can develop structured, non-random attention patterns that emphasize recent context and recurring textual cues. Overall, the experiment provided a clear and practical demonstration of how Transformer components work together in an autoregressive language modeling task.
+The attention visualizations and sample generations were particularly useful for interpreting the model's behavior. The generations were not fully coherent, but they reproduced local Shakespeare-like formatting, speaker labels, and short phrase structure. Overall, the experiment provided a clear and practical demonstration of how Transformer components work together in an autoregressive language modeling task.
 
 8. AI Tool Usage Disclosure
 
